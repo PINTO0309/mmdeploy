@@ -10,7 +10,7 @@ RUN apt-get update \
         python-is-python3 \
     && apt clean \
     && rm -rf /var/lib/apt/lists/* \
-    && pip instal -U pip
+    && pip install -U pip
 
 # build mmdeploy
 RUN git clone --recursive -b $MMDEPLOY_VERSION --depth 1 https://github.com/open-mmlab/mmdeploy.git \
