@@ -5,6 +5,13 @@ ARG MMDEPLOY_VERSION
 ENV BACKUP_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 ENV LD_LIBRARY_PATH=/usr/local/cuda/compat:$LD_LIBRARY_PATH
 
+RUN apt-get update \
+    && apt-get install -y \
+        python-is-python3 \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip instal -U pip
+
 # build mmdeploy
 RUN git clone --recursive -b $MMDEPLOY_VERSION --depth 1 https://github.com/open-mmlab/mmdeploy.git \
     && export Torch_DIR=$(python3 -c "import torch;print(torch.utils.cmake_prefix_path + '/Torch')") \
