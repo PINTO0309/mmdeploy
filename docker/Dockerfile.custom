@@ -1,0 +1,130 @@
+# MIT License
+
+# Copyright (c) 2023 Katsuya Hyodo
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+FROM docker.io/pinto0309/base-x64-ubuntu2204-cuda118:latest
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG CUDA=11.8
+ARG ONNXRUNTIME_VERSION=1.15.1
+ARG PPLCV_VERSION=v0.7.1
+ENV FORCE_CUDA="1"
+ENV TORCH_CUDA_ARCH_LIST=8.0;8.6
+ARG MMDEPLOY_VERSION=v1.2.0
+ARG USERNAME=user
+ARG WORKSPACE=/workspace
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        git \
+        wget \
+        libsm6 \
+        libxext6 \
+        libssl-dev \
+        libopencv-dev \
+        libspdlog-dev \
+        libxrender-dev \
+        libgl1-mesa-glx \
+        python-is-python3 \
+        python3-pip \
+        python3-all-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install -U pip \
+    && pip install pyyaml==6.0 \
+    && pip install numpy==1.25.1 \
+    && pip install ipython==8.14.0 \
+    && pip install cython==0.29.36 \
+    && pip install typing==3.7.4.3 \
+    && pip install typing_extensions==4.7.1 \
+    && pip install mkl==2023.2.0 \
+    && pip install mkl-include==2023.2.0 \
+    && pip install ninja==1.11.1 \
+    && pip install torch==2.0.1+cu118 torchvision==0.15.2+cu118 torchaudio==2.0.2+cu118 \
+        --index-url https://download.pytorch.org/whl/cu118 \
+    && pip install openmim==0.3.9 \
+    && pip install mmcv==2.0.1 \
+    && pip install mmengine==0.8.2 \
+    && pip install onnxruntime-gpu==1.15.1
+
+WORKDIR ${WORKSPACE}
+
+RUN wget https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz \
+    && tar -zxvf onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz
+
+ENV ONNXRUNTIME_DIR=${WORKSPACE}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}
+RUN git clone -b ${MMDEPLOY_VERSION} https://github.com/open-mmlab/mmdeploy \
+    && cd mmdeploy \
+    && git submodule update --init --recursive \
+    && mkdir -p build \
+    && cd build \
+    && cmake -DMMDEPLOY_TARGET_BACKENDS="ort" .. \
+    && make -j$(nproc) \
+    && cd .. \
+    && mim install -e .
+
+RUN git clone -b ${PPLCV_VERSION} https://github.com/openppl-public/ppl.cv.git \
+    && cd ppl.cv \
+    && ./build.sh cuda
+
+ENV BACKUP_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/local/cuda/compat/lib.real/:$LD_LIBRARY_PATH
+
+RUN cd ${WORKSPACE}/mmdeploy \
+    && rm -rf build/CM* build/cmake-install.cmake build/Makefile build/csrc \
+    && mkdir -p build \
+    && cd build \
+    && cmake .. \
+        -DMMDEPLOY_BUILD_SDK=ON \
+        -DMMDEPLOY_BUILD_EXAMPLES=ON \
+        -DCMAKE_CXX_COMPILER=g++ \
+        -Dpplcv_DIR=${WORKSPACE}/ppl.cv/cuda-build/install/lib/cmake/ppl \
+        -DONNXRUNTIME_DIR=${ONNXRUNTIME_DIR} \
+        -DMMDEPLOY_BUILD_SDK_PYTHON_API=ON \
+        -DMMDEPLOY_TARGET_DEVICES="cuda;cpu" \
+        -DMMDEPLOY_TARGET_BACKENDS="ort" \
+        -DMMDEPLOY_CODEBASES=all \
+    && make -j$(nproc) \
+    && make install \
+    && export SPDLOG_LEVEL=warn \
+    && echo "Built MMDeploy version ${MMDEPLOY_VERSION} for GPU devices successfully!"
+
+ENV LD_LIBRARY_PATH="${WORKSPACE}/mmdeploy/build/lib:${BACKUP_LD_LIBRARY_PATH}"
+
+RUN echo "root:root" | chpasswd \
+    && useradd \
+        --create-home \
+        --home-dir /home/${USERNAME} \
+        --shell /bin/bash \
+        --user-group \
+        --groups adm,sudo \
+        ${USERNAME} \
+    && echo "${USERNAME}:${USERNAME}" | chpasswd \
+    && cat /dev/null > /etc/sudoers.d/${USERNAME} \
+    && echo "%${USERNAME}    ALL=(ALL)   NOPASSWD:    ALL" >> \
+        /etc/sudoers.d/${USERNAME} \
+    && chown -R ${USERNAME}:${USERNAME} ${WORKSPACE}
+
+USER ${USERNAME}
+
+RUN echo "export USER=`whoami`" >> ~/.bashrc \
+    && echo 'export PATH=/usr/local/cuda/bin:${PATH}' >> ~/.bashrc \
+    && echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}' >> ~/.bashrc \
+    && echo 'export PATH=${PATH}:${HOME}/.local/bin' >> ~/.bashrc
