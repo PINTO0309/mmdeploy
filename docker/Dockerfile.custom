@@ -31,6 +31,8 @@ ARG MMDEPLOY_VERSION=v1.2.0
 ARG USERNAME=user
 ARG WORKSPACE=/workspace
 
+SHELL ["/bin/bash", "-c"]
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
@@ -72,13 +74,13 @@ RUN wget https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTI
 
 ENV ONNXRUNTIME_DIR=${WORKSPACE}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}
 RUN git clone -b ${MMDEPLOY_VERSION} https://github.com/open-mmlab/mmdeploy \
-    && cd mmdeploy \
+    && pushd mmdeploy \
     && git submodule update --init --recursive \
     && mkdir -p build \
-    && cd build \
+    && pushd build \
     && cmake -DMMDEPLOY_TARGET_BACKENDS="ort" .. \
     && make -j$(nproc) \
-    && cd .. \
+    && popd \
     && mim install -e .
 
 RUN git clone -b ${PPLCV_VERSION} https://github.com/openppl-public/ppl.cv.git \
@@ -110,7 +112,13 @@ RUN cd ${WORKSPACE}/mmdeploy \
 ENV LD_LIBRARY_PATH="${WORKSPACE}/mmdeploy/build/lib:${BACKUP_LD_LIBRARY_PATH}"
 
 RUN git clone -b v1.1.0 https://github.com/open-mmlab/mmpose.git \
-    && git clone -b v3.1.0 https://github.com/open-mmlab/mmdetection.git
+    && pushd mmpose \
+    && pip install -v -e . \
+    && popd \
+    && git clone -b v3.1.0 https://github.com/open-mmlab/mmdetection.git \
+    && pushd mmdetection \
+    && pip install -v -e . \
+    && popd
 
 RUN echo "root:root" | chpasswd \
     && useradd \
