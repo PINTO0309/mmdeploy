@@ -67,7 +67,7 @@ RUN pip install -U pip \
     && pip install mmcv==2.0.1 \
     && pip install mmengine==0.8.2 \
     && pip install onnxruntime-gpu==1.15.1 \
-    && pip install onnxsim=0.4.33
+    && pip install onnxsim==0.4.33
 
 WORKDIR ${WORKSPACE}
 
