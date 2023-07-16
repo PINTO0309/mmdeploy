@@ -106,8 +106,7 @@ RUN cd ${WORKSPACE}/mmdeploy \
         -DMMDEPLOY_CODEBASES=all \
     && make -j$(nproc) \
     && make install \
-    && export SPDLOG_LEVEL=warn \
-    && echo "Built MMDeploy version ${MMDEPLOY_VERSION} for GPU devices successfully!"
+    && export SPDLOG_LEVEL=warn
 
 ENV LD_LIBRARY_PATH="${WORKSPACE}/mmdeploy/build/lib:${BACKUP_LD_LIBRARY_PATH}"
 
