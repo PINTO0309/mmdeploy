@@ -47,6 +47,8 @@ RUN apt-get update \
         python-is-python3 \
         python3-pip \
         python3-all-dev \
+        python3-tk \
+        tk-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U pip \
@@ -64,7 +66,8 @@ RUN pip install -U pip \
     && pip install openmim==0.3.9 \
     && pip install mmcv==2.0.1 \
     && pip install mmengine==0.8.2 \
-    && pip install onnxruntime-gpu==1.15.1
+    && pip install onnxruntime-gpu==1.15.1 \
+    && pip install onnxsim=0.4.33
 
 WORKDIR ${WORKSPACE}
 
@@ -137,5 +140,5 @@ USER ${USERNAME}
 
 RUN echo "export USER=`whoami`" >> ~/.bashrc \
     && echo 'export PATH=/usr/local/cuda/bin:${PATH}' >> ~/.bashrc \
-    && echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}' >> ~/.bashrc \
+    && echo "export LD_LIBRARY_PATH=/usr/local/cuda/lib64:${WORKSPACE}/onnxruntime-linux-x64-1.15.1/lib/:${LD_LIBRARY_PATH}" >> ~/.bashrc \
     && echo 'export PATH=${PATH}:${HOME}/.local/bin' >> ~/.bashrc
