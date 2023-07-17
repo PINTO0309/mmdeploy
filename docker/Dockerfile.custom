@@ -28,6 +28,8 @@ ARG PPLCV_VERSION=v0.7.1
 ENV FORCE_CUDA="1"
 ENV TORCH_CUDA_ARCH_LIST=8.0;8.6
 ARG MMDEPLOY_VERSION=v1.2.0
+ARG MMPOSE_VERSION=v1.1.0
+ARG MMDETECTION_VERSION=v3.1.0
 ARG USERNAME=user
 ARG WORKSPACE=/workspace
 
@@ -66,14 +68,14 @@ RUN pip install -U pip \
     && pip install openmim==0.3.9 \
     && pip install mmcv==2.0.1 \
     && pip install mmengine==0.8.2 \
-    && pip install onnxruntime-gpu==1.15.1 \
+    && pip install onnxruntime-gpu==${ONNXRUNTIME_VERSION} \
     && pip install onnxsim==0.4.33
 
 WORKDIR ${WORKSPACE}
 
 RUN wget https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz \
     && tar -zxvf onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz \
-    && rm onnxruntime-linux-x64-1.15.1.tgz
+    && rm onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz
 
 ENV ONNXRUNTIME_DIR=${WORKSPACE}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}
 RUN git clone -b ${MMDEPLOY_VERSION} https://github.com/open-mmlab/mmdeploy \
@@ -113,11 +115,11 @@ RUN cd ${WORKSPACE}/mmdeploy \
 
 ENV LD_LIBRARY_PATH="${WORKSPACE}/mmdeploy/build/lib:${BACKUP_LD_LIBRARY_PATH}"
 
-RUN git clone -b v1.1.0 https://github.com/open-mmlab/mmpose.git \
+RUN git clone -b ${MMPOSE_VERSION} https://github.com/open-mmlab/mmpose.git \
     && pushd mmpose \
     && pip install -v -e . \
     && popd \
-    && git clone -b v3.1.0 https://github.com/open-mmlab/mmdetection.git \
+    && git clone -b ${MMDETECTION_VERSION} https://github.com/open-mmlab/mmdetection.git \
     && pushd mmdetection \
     && pip install -v -e . \
     && popd
@@ -140,5 +142,5 @@ USER ${USERNAME}
 
 RUN echo "export USER=`whoami`" >> ~/.bashrc \
     && echo 'export PATH=/usr/local/cuda/bin:${PATH}' >> ~/.bashrc \
-    && echo "export LD_LIBRARY_PATH=/usr/local/cuda/lib64:${WORKSPACE}/onnxruntime-linux-x64-1.15.1/lib/:${LD_LIBRARY_PATH}" >> ~/.bashrc \
+    && echo "export LD_LIBRARY_PATH=/usr/local/cuda/lib64:${WORKSPACE}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}/lib/:${LD_LIBRARY_PATH}" >> ~/.bashrc \
     && echo 'export PATH=${PATH}:${HOME}/.local/bin' >> ~/.bashrc
