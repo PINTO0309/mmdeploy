@@ -51,6 +51,7 @@ RUN apt-get update \
         python3-all-dev \
         python3-tk \
         tk-dev \
+        nano \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U pip \
